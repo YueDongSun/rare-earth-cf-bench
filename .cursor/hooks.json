@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".venv/bin/python tools/hooks/shell_guard.py",
+        "failClosed": true
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": ".venv/bin/python tools/hooks/read_guard.py",
+        "failClosed": true
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".venv/bin/python tools/hooks/after_file_edit.py",
+        "failClosed": true
+      }
+    ],
+    "stop": [
+      {
+        "command": ".venv/bin/python tools/hooks/stop_check.py",
+        "timeout": 600
+      }
+    ]
+  }
+}

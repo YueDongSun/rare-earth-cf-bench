@@ -1,0 +1,46 @@
+[project]
+name = "cfbench"
+version = "0.0.1"
+description = "Execution-graded benchmark for rare-earth crystal-field Hamiltonians."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Yuedong Sun" }]
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "mypy>=1.13.0",
+  "pre-commit>=4.0.0",
+  "pytest>=8.3.0",
+  "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "PL"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cfbench", "tools"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+mypy_path = "src"
+packages = ["cfbench"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+pythonpath = [".", "src"]
+markers = [
+  "slow: marks tests as slow; make check runs them",
+]

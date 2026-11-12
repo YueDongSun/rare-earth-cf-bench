@@ -1,0 +1,4 @@
+# The owner reviews every path. spec/ and data/gold/ are the scientific inputs.
+* @YueDongSun
+/spec/ @YueDongSun
+/data/gold/ @YueDongSun
