@@ -8,7 +8,7 @@ The owner (Yuedong Sun, @YueDongSun) merges to `main`. Agents do not merge. `AGE
 make setup && make check
 ```
 
-`make setup` creates the uv environment and installs the pre-commit, commit-msg, and pre-push hooks. After that, a commit on `main` is refused, a staged change under `spec/` or `data/gold/` is refused, and a non-conventional commit message is refused.
+`make setup` creates the uv environment and installs the pre-commit, commit-msg, and pre-push hooks. Run it before committing or starting an agent: the git, Cursor, and Claude hooks call `.venv/bin/python` and fail closed until that environment exists. After that, a commit on `main` is refused, a staged change under `spec/` or `data/gold/` is refused, and a non-conventional commit message is refused.
 
 The owner may set `OWNER_SPEC_EDIT=1` to commit scientific edits. Agents must not set that variable. Open a `needs-science-decision` issue instead.
 

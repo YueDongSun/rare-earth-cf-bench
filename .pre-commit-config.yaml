@@ -49,8 +49,9 @@ repos:
         name: spec and gold stay owner-only
         entry: .venv/bin/python tools/check_spec_untouched.py
         language: system
-        files: ^(spec/|data/gold/)
         stages: [pre-commit]
+        always_run: true
+        pass_filenames: false
 
       - id: conventional-commit
         name: conventional commit

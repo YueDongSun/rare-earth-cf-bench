@@ -14,7 +14,6 @@ from tools.hooks.policy import (
     CHECK_OUTPUT_TAIL,
     DEFAULT_MAX_BYTES,
     GOLD_MAX_BYTES,
-    OWNER_ONLY_MESSAGE,
     claude_pretool,
     commit_message_error,
     cursor_permission,
@@ -24,11 +23,11 @@ from tools.hooks.policy import (
     shell_denial,
     should_run_check,
     size_limit_bytes,
+    staged_paths_from_name_status,
     stop_block,
 )
 
 _REPO = Path(__file__).resolve().parents[1]
-_CURSOR_DENY_EXIT = 2
 
 
 def _run_script(
@@ -125,7 +124,11 @@ def test_commit_message_ignores_git_comments() -> None:
         ("git push -f origin feature", "feature", True),
         ("git push origin main", "feature", True),
         ("git push origin HEAD:main", "feature", True),
+        ("git push upstream main", "feature", True),
+        ("git push upstream HEAD:main", "feature", True),
         ("git commit --no-verify -m 'chore(tooling): x'", "feature", True),
+        ("git commit -n -m 'chore(tooling): x'", "feature", True),
+        ("git commit -m 'chore(tooling): x'", "feature", False),
         ("git reset --hard", "main", True),
         ("git reset --hard", "cursor/m0_scaffold", False),
         ("git reset --hard origin/main", "cursor/m0_scaffold", True),
@@ -174,17 +177,72 @@ def test_permission_objects() -> None:
     assert specific["permissionDecision"] == "deny"
 
 
-def test_check_spec_untouched_rejects_and_honours_owner_override(tmp_path: Path) -> None:
-    rejected = _run_script("tools/check_spec_untouched.py", args=["spec/SCIENCE.md"])
-    assert rejected.returncode == 1
-    assert OWNER_ONLY_MESSAGE in rejected.stderr
-    allowed_other = _run_script("tools/check_spec_untouched.py", args=["src/cfbench/__init__.py"])
-    assert allowed_other.returncode == 0
+def test_name_status_includes_delete_and_both_rename_sides() -> None:
+    payload = b"D\0spec/SCIENCE.md\0R100\0data/gold/a.csv\0src/a.csv\0"
+    assert staged_paths_from_name_status(payload) == [
+        "spec/SCIENCE.md",
+        "data/gold/a.csv",
+        "src/a.csv",
+    ]
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True)
+
+
+def _repo_with_spec(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    _git(repo, "config", "commit.gpgsign", "false")
+    (repo / "pyproject.toml").write_text("[project]\nname = 't'\n", encoding="utf-8")
+    (repo / "spec").mkdir()
+    (repo / "spec" / "SCIENCE.md").write_text("# Science\n", encoding="utf-8")
+    (repo / "src").mkdir()
+    (repo / "src" / "keep.py").write_text("x = 1\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "init")
+    return repo
+
+
+def _run_spec_check(
+    repo: Path,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(_REPO / "tools" / "check_spec_untouched.py")],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+
+def test_staged_spec_delete_is_rejected(tmp_path: Path) -> None:
+    repo = _repo_with_spec(tmp_path)
+    _git(repo, "rm", "spec/SCIENCE.md")
+    completed = _run_spec_check(repo)
+    assert completed.returncode == 1
+    assert "spec/SCIENCE.md" in completed.stderr
+
+
+def test_staged_spec_rename_out_is_rejected(tmp_path: Path) -> None:
+    repo = _repo_with_spec(tmp_path)
+    _git(repo, "mv", "spec/SCIENCE.md", "src/SCIENCE.md")
+    completed = _run_spec_check(repo)
+    assert completed.returncode == 1
+    assert "spec/SCIENCE.md" in completed.stderr
+
+
+def test_owner_override_allows_staged_spec_delete(tmp_path: Path) -> None:
+    repo = _repo_with_spec(tmp_path)
+    _git(repo, "rm", "spec/SCIENCE.md")
     env = dict(os.environ)
     env["OWNER_SPEC_EDIT"] = "1"
-    override = _run_script("tools/check_spec_untouched.py", args=["spec/SCIENCE.md"], env=env)
-    assert override.returncode == 0
-    assert tmp_path.is_dir()
+    assert _run_spec_check(repo, env).returncode == 0
 
 
 def test_commit_msg_script(tmp_path: Path) -> None:
@@ -264,16 +322,54 @@ def test_owner_path_guard_denies_spec_edit() -> None:
     assert allowed.stdout.strip() == ""
 
 
-def test_after_file_edit_denies_spec_and_formats_python(tmp_path: Path) -> None:
+def test_cursor_pre_tool_denies_owner_paths_before_edit() -> None:
+    denied = _run_script(
+        "tools/hooks/owner_path_guard.py",
+        {
+            "hook_event_name": "preToolUse",
+            "tool_name": "Delete",
+            "tool_input": {"path": "data/gold/values.csv"},
+        },
+    )
+    assert json.loads(denied.stdout)["permission"] == "deny"
+    renamed = _run_script(
+        "tools/hooks/owner_path_guard.py",
+        {
+            "hook_event_name": "preToolUse",
+            "tool_name": "Write",
+            "tool_input": {"path": "tools/../spec/SCIENCE.md"},
+        },
+    )
+    assert json.loads(renamed.stdout)["permission"] == "deny"
+    patch = _run_script(
+        "tools/hooks/owner_path_guard.py",
+        {
+            "hook_event_name": "preToolUse",
+            "tool_name": "ApplyPatch",
+            "tool_input": {"patch": "*** Begin Patch\n*** Update File: spec/SCIENCE.md\n"},
+        },
+    )
+    assert json.loads(patch.stdout)["permission"] == "deny"
+    allowed = _run_script(
+        "tools/hooks/owner_path_guard.py",
+        {
+            "hook_event_name": "preToolUse",
+            "tool_name": "StrReplace",
+            "tool_input": {"path": "src/cfbench/__init__.py"},
+        },
+    )
+    assert json.loads(allowed.stdout)["permission"] == "allow"
+
+
+def test_after_file_edit_formats_python(tmp_path: Path) -> None:
     spec_edit = _run_script(
         "tools/hooks/after_file_edit.py",
         {
             "hook_event_name": "afterFileEdit",
-            "file_path": str(_REPO / "data" / "gold" / ".gitkeep"),
+            "file_path": str(_REPO / "spec" / "SCIENCE.md"),
         },
     )
-    assert spec_edit.returncode == _CURSOR_DENY_EXIT
-    assert OWNER_ONLY_MESSAGE in spec_edit.stderr
+    assert spec_edit.returncode == 0
     target = tmp_path / "sample.py"
     target.write_text("x=1\n", encoding="utf-8")
     formatted = _run_script(

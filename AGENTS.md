@@ -43,11 +43,13 @@ Task ids are `<family>_<nnn>_<slug>` in snake_case, for example `cf_t2_001_laf3_
 
 ## Commands
 
-- `make setup` installs the environment and the git hooks.
+- `make setup` installs the environment and the git hooks. Run it first: the hooks call `.venv/bin/python` and fail closed until that interpreter exists.
 - `make check` is the bar: format check, lint, type check, pytest, and `make validate`.
 - `make validate` checks every task directory, runs its reference solution, and requires a do-nothing run to fail the verifier.
 
 ## Hooks
+
+Run `make setup` before an agent session. The hook commands call `.venv/bin/python` and fail closed until the environment exists.
 
 Three layers, same rules:
 

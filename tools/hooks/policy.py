@@ -60,10 +60,68 @@ _GIT_PUSH = re.compile(r"\bgit(?:\s+-C\s+\S+)?\s+push\b")
 _GIT_COMMIT = re.compile(r"\bgit(?:\s+-C\s+\S+)?\s+commit\b")
 _GIT_RESET_HARD = re.compile(r"\bgit(?:\s+-C\s+\S+)?\s+reset\s+--hard(?:\s+(\S+))?")
 _SHORT_FORCE = re.compile(r"(?:^|\s)-[A-Za-z]*f[A-Za-z]*(?:\s|$)")
-_ORIGIN_MAIN = re.compile(r"\borigin\s+main(?:\s|$)")
 _REF_MAIN = re.compile(r":(?:refs/heads/)?main(?:\s|$)")
+_BARE_MAIN_REF = re.compile(r"(?:^|\s)(?:refs/heads/)?main(?:\s|$)")
+_SHORT_NO_VERIFY = re.compile(r"(?:^|\s)-n(?:\s|$)")
+_PATCH_FILE = re.compile(
+    r"^\*\*\* (?:Add|Update|Delete) File: (\S.*)$|^\*\*\* Move to: (\S.*)$",
+    re.MULTILINE,
+)
+_PATH_KEYS = frozenset({"file_path", "path", "target_file", "filePath", "target_notebook"})
 _PIP_INSTALL = re.compile(r"(?:^|\s)pip3?\s+install\b")
 _PYTHON_PIP = re.compile(r"\bpython3?\s+-m\s+pip\s+install\b")
+
+
+def staged_paths_from_name_status(payload: bytes) -> list[str]:
+    """Paths from ``git diff --cached --name-status -z -M``, both rename sides."""
+    parts = payload.split(b"\0")
+    if parts and parts[-1] == b"":
+        parts.pop()
+    paths: list[str] = []
+    index = 0
+    while index < len(parts):
+        status = parts[index].decode("utf-8")
+        index += 1
+        if status[:1] in {"R", "C"}:
+            paths.append(parts[index].decode("utf-8"))
+            paths.append(parts[index + 1].decode("utf-8"))
+            index += 2
+        else:
+            paths.append(parts[index].decode("utf-8"))
+            index += 1
+    return paths
+
+
+def owner_paths_in_cached_diff(repo_root: Path) -> list[str]:
+    """Owner-only paths in the staged diff, including deletes and renames."""
+    completed = subprocess.run(
+        ["git", "diff", "--cached", "--name-status", "-z", "-M"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    return [
+        path
+        for path in staged_paths_from_name_status(completed.stdout)
+        if is_owner_only(path, repo_root)
+    ]
+
+
+def tool_target_paths(payload: dict[str, object]) -> list[str]:
+    """File paths a write, edit, or delete tool is about to change."""
+    paths: list[str] = []
+    direct = payload.get("file_path")
+    if isinstance(direct, str) and direct != "":
+        paths.append(direct)
+    tool_input = payload.get("tool_input")
+    if isinstance(tool_input, dict):
+        _collect_tool_paths(tool_input, paths)
+        patch = tool_input.get("patch")
+        if isinstance(patch, str):
+            paths.extend(_patch_paths(patch))
+    elif isinstance(tool_input, str):
+        paths.extend(_patch_paths(tool_input))
+    return paths
 
 
 def is_owner_only(path: str, repo_root: Path | None = None) -> bool:
@@ -258,6 +316,25 @@ def _relative_path(path: str, repo_root: Path | None) -> str:
     return resolved.as_posix()
 
 
+def _collect_tool_paths(table: dict[str, object], paths: list[str]) -> None:
+    for key, value in table.items():
+        if key in _PATH_KEYS and isinstance(value, str) and value != "":
+            paths.append(value)
+        elif key == "edits" and isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    _collect_tool_paths(item, paths)
+
+
+def _patch_paths(patch: str) -> list[str]:
+    paths: list[str] = []
+    for match in _PATCH_FILE.finditer(patch):
+        path = match.group(1) if match.group(1) is not None else match.group(2)
+        if path is not None:
+            paths.append(path.strip())
+    return paths
+
+
 def _segments(command: str) -> list[str]:
     return [part for part in _SEGMENT.split(command) if part.strip() != ""]
 
@@ -288,11 +365,13 @@ def _force_push(segment: str) -> bool:
 def _pushes_main(segment: str) -> bool:
     if _GIT_PUSH.search(segment) is None:
         return False
-    return _ORIGIN_MAIN.search(segment) is not None or _REF_MAIN.search(segment) is not None
+    return _BARE_MAIN_REF.search(segment) is not None or _REF_MAIN.search(segment) is not None
 
 
 def _commit_no_verify(segment: str) -> bool:
-    return _GIT_COMMIT.search(segment) is not None and "--no-verify" in segment
+    if _GIT_COMMIT.search(segment) is None:
+        return False
+    return "--no-verify" in segment or _SHORT_NO_VERIFY.search(segment) is not None
 
 
 def _reset_hard_on_shared(segment: str, current_branch: str) -> bool:
