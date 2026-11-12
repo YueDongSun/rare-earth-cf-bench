@@ -1,0 +1,27 @@
+name: Task
+description: Engineering or content work to add or change a benchmark task.
+title: "task: "
+labels:
+  - task
+body:
+  - type: textarea
+    id: spec-reference
+    attributes:
+      label: Spec reference
+      description: Exact `spec/...#anchor` lines this task implements.
+    validations:
+      required: true
+  - type: input
+    id: task-id
+    attributes:
+      label: Task id
+      description: "`<family>_<nnn>_<slug>` in snake_case."
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: File scope
+      description: Paths the claimer may edit. One agent owns this issue at a time.
+    validations:
+      required: true

@@ -1,0 +1,25 @@
+name: Bug
+description: Report a defect in the harness, a verifier, or the tooling.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: The command you ran and the output that shows the failure.
+    validations:
+      required: true

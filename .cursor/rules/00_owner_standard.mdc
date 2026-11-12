@@ -1,0 +1,15 @@
+---
+description: Owner coding standard for rare-earth-cf-bench
+alwaysApply: true
+---
+
+# Owner standard
+
+- snake_case for project-owned paths and identifiers (directories, modules, task ids, scripts, labels where possible). Keep required external names: `AGENTS.md`, `README.md`, `Dockerfile`, `pyproject.toml`, `task.toml`, `.pre-commit-config.yaml`, `.cursor/`, `.claude/`, GitHub template filenames, and the repository name.
+- English for code comments, docs, ADRs, and agent instructions.
+- No attribution trailers on ordinary commits (`Co-authored-by`, `Generated-by`, "made with").
+- One mutable owner per issue, branch, and worktree. Do not edit, rebase, or push another agent's branch. Preserve concurrent and unknown dirty work. Never force-remove a worktree or a branch.
+- Preparation, installation, registration, a successful call, and end-to-end acceptance are separate states. Say which state a claim reached. Nothing is verified without the command output.
+- Never commit credentials, host inventories, chat histories, tokens, or token-bearing URLs. Keep third-party license notices when vendoring.
+- Update README and affected docs in the same pull request, with verified behaviour only.
+- Repository visibility is decided by the owner only.

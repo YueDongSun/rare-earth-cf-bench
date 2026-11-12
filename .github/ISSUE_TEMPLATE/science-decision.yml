@@ -1,0 +1,29 @@
+name: Science decision
+description: Ask the owner to decide a scientific point the spec does not state.
+title: "science: "
+labels:
+  - needs-science-decision
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Stop work on the affected piece until the owner answers. Do not guess a convention, a tolerance, or a constant.
+  - type: textarea
+    id: spec-line
+    attributes:
+      label: Spec line
+      description: Exact spec path, anchor, and quotation.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Concrete options
+    validations:
+      required: true
+  - type: textarea
+    id: blocked
+    attributes:
+      label: Work that is blocked
+    validations:
+      required: true

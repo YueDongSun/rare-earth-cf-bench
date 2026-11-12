@@ -1,0 +1,13 @@
+---
+description: spec/ and data/gold/ are owner-only
+alwaysApply: true
+---
+
+# Owner-only science
+
+- Do not edit `spec/` or `data/gold/`. Do not set `OWNER_SPEC_EDIT`.
+- Do not invent a convention, a tolerance, a basis order, a unit, a sign, or a literature value. `spec/` headings with `TODO(owner)` are not scientific content.
+- If a spec point is missing or ambiguous, open a GitHub issue labelled `needs-science-decision`, quote the exact spec line, list the concrete options, and stop work on that piece.
+- Reading `spec/` is required. Editing it is not.
+- Every behaviour in `src/`, `tasks/`, `tests/`, `tools/`, and `docs/` traces to a spec line or to an ADR in `docs/adr/`.
+- PyCrystalField is an unchosen reference-solver candidate. Do not add it as a dependency unless the owner decides that in the spec or an issue.

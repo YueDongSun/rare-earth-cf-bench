@@ -1,0 +1,15 @@
+---
+description: Code, task format, hooks, and review rules
+alwaysApply: true
+---
+
+# Engineering
+
+- Python 3.12, uv, committed `uv.lock`. `uv add` only; never `pip install`.
+- ruff (E, F, W, I, B, UP, SIM, RUF, N, PL, line length 100) and `mypy --strict` on `src/`. pytest uses `--strict-markers`; slow tests are marked `slow` and still run in `make check`.
+- No broad `try/except`, silent fallback, speculative abstraction, checksum manifest, or live model call.
+- Numerical code, when the spec requires it, uses NumPy/SciPy, prefers exact diagonalisation, and documents basis order. Docstrings point at the spec section and state units.
+- Task ids: `<family>_<nnn>_<slug>`. Format is `docs/adr/0002-task-format.md`. Science-task numeric checks take tolerances by name from `spec/TOLERANCES.md`. `example_000_smoke` is a format demo and is not a template for physics checks.
+- `make check` must pass before a branch is pushed. Do not push to `main`, force-push, or commit with `--no-verify`. Do not `git reset --hard` on `main`.
+- Commit messages: `type(scope): subject` with scope `task`, `verify`, `reference`, `taskfmt`, `tooling`, `docs`, `ci`, `deps`, or `spec`.
+- One issue, one branch (`<agent>/<issue_number>_<slug>`), one PR. Comment `claim` and add `in-progress` before starting. The owner merges. PR body includes the template sections and the `make check` output. Update `PROGRESS.md` when status changes. Task-format, public-API, or layout changes need a new ADR.

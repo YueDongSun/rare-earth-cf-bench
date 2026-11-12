@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".venv/bin/python tools/hooks/shell_guard.py",
+        "failClosed": true
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": ".venv/bin/python tools/hooks/read_guard.py",
+        "failClosed": true
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": ".venv/bin/python tools/hooks/owner_path_guard.py",
+        "matcher": "Write|Edit|StrReplace|Delete|MultiEdit|ApplyPatch",
+        "failClosed": true
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".venv/bin/python tools/hooks/after_file_edit.py",
+        "failClosed": true
+      }
+    ],
+    "stop": [
+      {
+        "command": ".venv/bin/python tools/hooks/stop_check.py",
+        "timeout": 600
+      }
+    ]
+  }
+}

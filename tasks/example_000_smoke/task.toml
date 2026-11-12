@@ -1,0 +1,12 @@
+# Format demo. This file does not define crystal-field physics.
+id = "example_000_smoke"
+family = "example"
+difficulty = "trivial"
+spec_reference = "docs/adr/0002-task-format.md"
+author = "m0_scaffold"
+status = "draft"
+
+[timeouts]
+build_sec = 120
+agent_sec = 60
+verifier_sec = 60

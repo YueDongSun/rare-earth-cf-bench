@@ -1,0 +1,69 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: no-commit-to-branch
+        args: ["--branch", "main"]
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: "0.9.1"
+    hooks:
+      - id: nbstripout
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: .venv/bin/ruff format --check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        stages: [pre-commit]
+
+      - id: ruff-check
+        name: ruff lint
+        entry: .venv/bin/ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        stages: [pre-commit]
+
+      - id: mypy
+        name: mypy
+        entry: .venv/bin/mypy src
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      - id: check-added-large-files
+        name: check added large files
+        entry: .venv/bin/python tools/hooks/large_files.py
+        language: system
+        types: [file]
+        stages: [pre-commit]
+
+      - id: check-spec-untouched
+        name: spec and gold stay owner-only
+        entry: .venv/bin/python tools/check_spec_untouched.py
+        language: system
+        stages: [pre-commit]
+        always_run: true
+        pass_filenames: false
+
+      - id: conventional-commit
+        name: conventional commit
+        entry: .venv/bin/python tools/hooks/commit_msg.py
+        language: system
+        stages: [commit-msg]
+        always_run: true
+
+      - id: pre-push-check
+        name: refuse main and run make check
+        entry: .venv/bin/python tools/hooks/pre_push.py
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
