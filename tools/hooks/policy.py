@@ -243,18 +243,19 @@ def find_repo_root(start: Path) -> Path:
 
 
 def _relative_path(path: str, repo_root: Path | None) -> str:
-    candidate = Path(path)
-    if candidate.is_absolute() and repo_root is not None:
-        resolved = candidate.resolve()
-        root = repo_root.resolve()
-        if resolved.is_relative_to(root):
-            candidate = resolved.relative_to(root)
-        else:
-            return resolved.as_posix()
-    text = candidate.as_posix()
-    if text.startswith("./"):
-        return text[2:]
-    return text
+    """Return a repo-relative path, with ``..`` resolved when the root is known."""
+    text = path.replace("\\", "/")
+    candidate = Path(text)
+    if repo_root is None:
+        if text.startswith("./"):
+            return text[2:]
+        return text
+    root = repo_root.resolve()
+    base = candidate if candidate.is_absolute() else root / candidate
+    resolved = base.resolve()
+    if resolved.is_relative_to(root):
+        return resolved.relative_to(root).as_posix()
+    return resolved.as_posix()
 
 
 def _segments(command: str) -> list[str]:

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -106,8 +107,8 @@ def validate_tasks(tasks_root: Path) -> str:
 
 def validate_task(task_dir: Path) -> str:
     """Check structure, require the solution to pass, and require do-nothing to fail."""
-    load_manifest(task_dir)
-    solved = _run_with_solution(task_dir)
+    manifest = load_manifest(task_dir)
+    solved = _run_with_solution(task_dir, manifest.timeouts)
     if solved.returncode != 0:
         raise TaskFormatError(
             f"{task_dir.name}: reference solution failed its verifier\n{solved.output}"
@@ -127,9 +128,9 @@ def validate_task(task_dir: Path) -> str:
 
 def run_empty_verifier(task_dir: Path) -> VerifierRun:
     """Run the verifier in an empty workspace, without the reference solution."""
-    load_manifest(task_dir)
+    manifest = load_manifest(task_dir)
     with tempfile.TemporaryDirectory(prefix="cfbench-empty-") as empty:
-        return _verifier(task_dir, Path(empty))
+        return _verifier(task_dir, Path(empty), manifest.timeouts.verifier_sec)
 
 
 def load_manifest(task_dir: Path) -> TaskManifest:
@@ -152,22 +153,20 @@ def load_manifest(task_dir: Path) -> TaskManifest:
     return manifest
 
 
-def _run_with_solution(task_dir: Path) -> VerifierRun:
+def _run_with_solution(task_dir: Path, timeouts: Timeouts) -> VerifierRun:
     with tempfile.TemporaryDirectory(prefix="cfbench-sol-") as solved_name:
         workspace = Path(solved_name)
-        _run_solution(task_dir, workspace)
-        return _verifier(task_dir, workspace)
+        _run_solution(task_dir, workspace, timeouts.agent_sec)
+        return _verifier(task_dir, workspace, timeouts.verifier_sec)
 
 
-def _run_solution(task_dir: Path, workspace: Path) -> None:
+def _run_solution(task_dir: Path, workspace: Path, timeout_sec: int) -> None:
     script = (task_dir / "solution" / "solve.sh").resolve()
-    completed = subprocess.run(
+    completed = _run_bounded(
         ["bash", str(script)],
-        cwd=workspace,
-        env=_workspace_env(workspace),
-        capture_output=True,
-        text=True,
-        check=False,
+        workspace,
+        timeout_sec,
+        f"{task_dir.name}: reference solution exceeded {timeout_sec}s",
     )
     if completed.returncode != 0:
         raise TaskFormatError(
@@ -176,19 +175,47 @@ def _run_solution(task_dir: Path, workspace: Path) -> None:
         )
 
 
-def _verifier(task_dir: Path, workspace: Path) -> VerifierRun:
+def _verifier(task_dir: Path, workspace: Path, timeout_sec: int) -> VerifierRun:
     test_file = (task_dir / "tests" / "test_outputs.py").resolve()
-    completed = subprocess.run(
+    completed = _run_bounded(
         [sys.executable, "-m", "pytest", "-q", str(test_file)],
-        cwd=workspace,
-        env=_workspace_env(workspace),
-        capture_output=True,
-        text=True,
-        check=False,
+        workspace,
+        timeout_sec,
+        f"{task_dir.name}: verifier exceeded {timeout_sec}s",
     )
     return VerifierRun(
         returncode=completed.returncode,
         output=completed.stdout + completed.stderr,
+    )
+
+
+def _run_bounded(
+    command: list[str],
+    workspace: Path,
+    timeout_sec: int,
+    timeout_message: str,
+) -> subprocess.CompletedProcess[str]:
+    """Run ``command`` and stop the whole process group when ``timeout_sec`` elapses."""
+    process = subprocess.Popen(
+        command,
+        cwd=workspace,
+        env=_workspace_env(workspace),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_sec)
+    except subprocess.TimeoutExpired as exc:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.communicate()
+        raise TaskFormatError(timeout_message) from exc
+    return subprocess.CompletedProcess(
+        command,
+        process.returncode,
+        stdout=stdout,
+        stderr=stderr,
     )
 
 

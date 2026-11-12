@@ -26,6 +26,8 @@ Task ids match `<family>_<nnn>_<slug>` in snake_case. The directory name equals 
 
 The local harness sets `CFBENCH_WORKSPACE` to an empty directory, runs `solution/solve.sh` with that variable set, then runs the verifier with the same variable. The do-nothing run sets `CFBENCH_WORKSPACE` to a fresh empty directory and runs the verifier without the solution. `make validate` passes a task only when the solution run's verifier exits 0 and the do-nothing run's verifier exits non-zero.
 
+`agent_sec` limits `solution/solve.sh`. `verifier_sec` limits each verifier run, including the do-nothing run. Exceeding either limit is a task-format failure, and the timed-out process group is killed. `build_sec` limits building `environment/Dockerfile`. Local validate does not build that image, so it checks that `build_sec` is a positive integer and does not apply it.
+
 `tasks/example_000_smoke` is a format demo. Its status is `draft`. It checks that the solution wrote the marker file named in its instruction. That marker is not a physical quantity. Science tasks must not copy this pattern: their numeric checks take tolerances by name from `spec/TOLERANCES.md`, which the owner has not filled.
 
 `tools/new_task.py` creates the same files with the solution exiting non-zero. A scaffold is not a passing task.

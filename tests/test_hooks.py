@@ -51,12 +51,18 @@ def _run_script(
     )
 
 
-def test_owner_only_paths() -> None:
-    root = Path("/repo")
+def test_owner_only_paths(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
     assert is_owner_only("spec/SCIENCE.md")
     assert is_owner_only("./spec/SCIENCE.md")
     assert is_owner_only("data/gold/values.csv")
     assert is_owner_only(str(root / "spec" / "SCIENCE.md"), root)
+    assert is_owner_only("tools/../spec/SCIENCE.md", root)
+    assert is_owner_only(str(root / "tools" / ".." / "data" / "gold" / "values.csv"), root)
+    assert not is_owner_only("spec/../src/cfbench/__init__.py", root)
+    assert not is_owner_only("data/gold/../other/values.csv", root)
+    assert not is_owner_only(str(tmp_path / "spec" / "SCIENCE.md"), root)
     assert not is_owner_only("src/cfbench/taskfmt/validate.py")
     assert not is_owner_only("data/other/values.csv")
     assert not is_owner_only("specs/SCIENCE.md")
@@ -218,6 +224,20 @@ def test_read_guard_allows_spec() -> None:
     )
     assert completed.returncode == 0
     assert json.loads(completed.stdout)["permission"] == "allow"
+
+
+def test_owner_path_guard_denies_dotdot_spec_edit() -> None:
+    denied = _run_script(
+        "tools/hooks/owner_path_guard.py",
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "tools/../spec/SCIENCE.md"},
+        },
+    )
+    assert denied.returncode == 0
+    specific = json.loads(denied.stdout)["hookSpecificOutput"]
+    assert specific["permissionDecision"] == "deny"
 
 
 def test_owner_path_guard_denies_spec_edit() -> None:
