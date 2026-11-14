@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-if [ -z "${CFBENCH_WORKSPACE}" ]; then
+if [ -z "${CFBENCH_WORKSPACE:-}" ]; then
   echo "CFBENCH_WORKSPACE is not set" >&2
   exit 1
 fi
